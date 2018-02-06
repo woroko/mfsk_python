@@ -1,0 +1,71 @@
+<TxArea@BoxLayout>:
+    orientation: 'horizontal'
+    msgInput: msgIn
+
+    Label:
+        text: 'MSG: '
+        #size_hint: (0.1, 0.5)
+        size: (dp(50), dp(50))
+        size_hint: (None, None)
+    ScrollView:
+        id: scrlv1
+        scroll_type: ['bars', 'content']
+        bar_width: 15
+        effect_cls: 'ScrollEffect'
+        TextInput:
+            id: msgIn
+            multiline: True
+            size_hint: (1, None)
+            #size: (0, 50)
+            height: max( (len(self._lines)+1) * self.line_height, scrlv1.height)
+    Button:
+        text: 'Send'
+        size: (dp(70), dp(50))
+        size_hint: (None, None)
+
+<LowerButtons@BoxLayout>:
+    orientation: 'horizontal'
+    size_hint: (1, None)
+    Button:
+        text: 'Start TX'
+        on_release: print("BTN: Start TX")
+        size: (dp(70),dp(50))
+        size_hint: (None, None)
+    Button:
+        text: 'Settings'
+        on_release: print("BTN: Settings")
+        size: (dp(70),dp(50))
+        size_hint: (None, None)
+
+<MyLayout@BoxLayout>:
+    id: boxlayout0
+    orientation: 'vertical'
+    #padding: 0,0,0,0
+    #pos_hint: {'top': 0}
+
+    ScrollView:
+        id: scrlv0
+        scroll_type: ['bars', 'content']
+        bar_width: 15
+        effect_cls: 'ScrollEffect'
+        size_hint: (1, 1)
+        TextInput:
+            id: ti0
+            text: 'Receive Window V2.1'
+            multiline: True
+            size_hint: (1, None)
+            readonly: False
+            #size_hint_y: None
+            height: max( (len(self._lines)+1) * self.line_height, scrlv0.height)
+
+    TxArea:
+        id: txarea0
+        height: dp(50)
+        size_hint: (1, None) #IMPORTANT!
+
+    LowerButtons:
+        id: lowerbuttons
+        height: dp(50)
+        size_hint: (1, None)
+
+MyLayout
