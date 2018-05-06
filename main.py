@@ -14,12 +14,18 @@ from kivy.properties import VariableListProperty
 from kivy.metrics import *
 
 from numpy.lib import stride_tricks
-from PIL import Image
+#from PIL import Image
 
-from txrxlib import main as testtx
+from txrxlib import *
 
 import threading
 import time
+from audiostream import get_output, AudioSample
+from audiostream.sources.wave import SineSource
+import struct
+from functools import partial
+import sounddevice as sd
+import Queue
 
 #Window.size = (600,320)
 
@@ -123,7 +129,37 @@ def stft(sig, frameSize, overlapFac=0.5, window=np.hanning):
 
     return np.fft.rfft(frames)
 
-
+def testtone(context, text_to_tx):
+    sendbits = string2bits(text_to_tx)
+    bits = tx_bits(sendbits, None, M=2, CustomRs=50, CustomTsMult=1, CustomTsDiv=1, preamble=0)
+    
+    fill = np.zeros((2374), dtype=np.int16)
+    #apply test offset
+    #its = np.concatenate((np.squeeze(fill), bits))
+    
+    txg = bits.astype(np.int16).tolist()
+    writeout = struct.pack('<' + 'h'*len(txg), *txg)
+    
+    context.sample.write(writeout)
+    #print("---BITS---: " + str(bits))
+    print("bits.shape: " + str(bits.shape))
+    
+    context.rec_queue.put(bits)
+    
+def record_process(context, rec_queue, duration):
+    fs = 8000
+    rec = None
+    
+    #while True:
+    if platform == 'linux':
+        rec = sd.rec(int(duration*fs), samplerate=fs, channels=1, blocking=True, dtype='int16')
+        sd.wait()
+        rec_queue.put(np.squeeze(rec))
+     
+def decode_sound(context, to_decode, dec_queue):
+    decoded = rx_bits(to_decode, M=2, EbNodB=-1, CustomRs=50, CustomTsMult=1, CustomTsDiv=1)
+    dec_queue.put(decoded)
+    
 class MyApp(App):
     stop = threading.Event()
 
@@ -136,21 +172,54 @@ class MyApp(App):
         if platform == 'android':
             #pass
             self.root.padding = [0,0,0,dp(25)]
-
+        
+        self.stream = get_output(channels=1, rate=8000, buffersize=128)
+        self.sample = AudioSample()
+        self.stream.add_sample(self.sample)
+        self.sample.play()
+        self.rec_queue = Queue.Queue()
+        self.dec_queue = Queue.Queue()
+        np.set_printoptions(threshold=np.inf)
         #root.add_widget(FigureCanvasKivyAgg(plt.gcf()))
+        
+        #print(self.root.ids.ti0.ids)
 
 
     def on_stop(self):
         self.stop.set()
 
     def testthread(self, *l):
-        threading.Thread(target=testtx, args=(self,)).start()
-        pass
+        #print(self.root.ids.txarea0.ids.msgIn.text)
+        threading.Thread(target=testtone, args=(self,self.root.ids.txarea0.ids.msgIn.text)).start()
+    
+    def start_rec(self, duration):
+        recordingThread = threading.Thread(target=record_process, args=(self,self.rec_queue,duration))
+        recordingThread.start()
+        
+    def check_rec_dec_queue(self, dt):
+        if (self.rec_queue.qsize() > 0):
+            try:
+                to_decode = self.rec_queue.get_nowait()
+                print("to_decode shape: " + str(to_decode.shape))
+                decodingThread = threading.Thread(target=decode_sound, args=(self,to_decode,self.dec_queue))
+                decodingThread.start()
+            except Queue.Empty:
+                pass
+            
+        if (self.dec_queue.qsize() > 0):
+            try:
+                decode_result = self.dec_queue.get_nowait()
+                self.root.ids.ti0.text += str(decode_result) + "\n\n---\n\n"
+                #self.root.ids.ti0.text += "longest: " + 
+            except Queue.Empty:
+                pass
+            
 
     def build(self):
         self.root = Builder.load_file('guitest.kv')
         Clock.schedule_once(self._do_setup)
-        Clock.schedule_once(self.testthread)
+        Clock.schedule_interval(self.check_rec_dec_queue, 0.1)
+        #Clock.schedule_once(self.testthread)
         return self.root
 
 if __name__ == '__main__':

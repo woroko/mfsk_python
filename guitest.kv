@@ -22,13 +22,15 @@
         text: 'Send'
         size: (dp(70), dp(50))
         size_hint: (None, None)
+        on_release: app.testthread()
 
 <LowerButtons@BoxLayout>:
     orientation: 'horizontal'
     size_hint: (1, None)
     Button:
         text: 'Start TX'
-        on_release: print("BTN: Start TX")
+        #on_release: print("BTN: Start TX")
+        on_release: app.start_rec(14)
         size: (dp(70),dp(50))
         size_hint: (None, None)
     Button:

@@ -196,6 +196,7 @@ class States:
         self.f_int = f_int
 
 
+        
         print("integrate!")
 
         # fine timing estimation -----------------------------------------------
@@ -217,7 +218,7 @@ class States:
         x = np.dot(timing_nl, np.exp(-1j*w*np.arange(0,Np)).transpose())
         norm_rx_timing = np.angle(x)/(2*np.pi)
         rx_timing = norm_rx_timing*P
-
+        
         self.x = x
         self.timing_nl = timing_nl
         self.rx_timing = rx_timing
@@ -245,9 +246,11 @@ class States:
         next_nin = N
         if norm_rx_timing > 0.25:
             next_nin += Ts/2
-        if norm_rx_timing < -0.25:
+            #print("next_nin + " + str(Ts/2))
+        if norm_rx_timing < 0.25:
             next_nin -= Ts/2
-
+            #print("next_nin - " + str(Ts/2))
+        
         self.nin = int(next_nin)
 
         # Now we know the correct fine timing offset, Re-sample integrator
@@ -258,8 +261,8 @@ class States:
         fract = rx_timing - low_sample
         high_sample = int(ceil(rx_timing))
 
-        if np.bitwise_and(verbose,0x2) == 1:
-            printf("rx_timing: #3.2f low_sample: #d high_sample: #d fract: #3.3f nin_next: #d\n", rx_timing, low_sample, high_sample, fract, next_nin)
+        #if np.bitwise_and(verbose,0x2) == 1:
+        print("rx_timing: {:3.2f} low_sample: {} high_sample: {} fract: {:3.3f} nin_next: {}\n".format(rx_timing, low_sample, high_sample, fract, next_nin))
 
         f_int_resample = np.zeros((M,nsym), dtype=np.complex_)
         rx_bits = np.zeros(nsym*self.bitspersymbol, dtype=np.uint8)
@@ -269,12 +272,23 @@ class States:
 
         for i in range(0,nsym):
             st = i*P
-            f_int_resample[:,i] = f_int[:,st+low_sample]*(1-fract) + f_int[:,st+high_sample]*fract
+            st_end = (i+1)*P
+            if (st_end >= f_int.shape[1]):
+                st_end = f_int.shape[1] - 1
+                
+            #print("st_end: " + str(st_end))
+            #replaced by argmax above
+            #f_int_resample[:,i] = f_int[:,st+low_sample]*(1-fract) + f_int[:,st+high_sample]*fract
+            f_int_slice = f_int[:,st:st_end]
+            f_int_max_x, f_int_max_y = np.unravel_index(f_int_slice.argmax(), f_int_slice.shape)
+            #f_int_resample[:,i] = f_int[:,f_int_max_y]
             #print(str(f_int_resample[:,i]) + "<-detection: f_int_resample")
             #print(str(f_int[:,st+low_sample]) + "<-f_int low_sample")
             # Largest amplitude tone is the winner.  Map this FSK "symbol" back to a bunch-o-bits,
             # depending on M.
-            tone_index = np.argmax(f_int_resample[:,i], axis=0)
+            #tone_index = np.argmax(f_int_resample[:,i], axis=0)
+            tone_index = f_int_max_x
+            print("tone_index" + str(tone_index))
             #print("detection: tone_index=" + str(tone_index))
             tone_max[i] = f_int_resample[tone_index, i]
             st = (i)*self.bitspersymbol
