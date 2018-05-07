@@ -189,7 +189,7 @@ class States:
         f_int = np.zeros((M, (nsym+1)*P), dtype=np.complex_)
 
         for i in range(0,(nsym+1)*P):
-            st = int(0 + (i-1)*Ts/P)
+            st = int(0 + (i)*Ts/P)
             en = st+Ts
             f_int[0:M,i] = np.sum(f_dc[0:M,st:en], axis=1) #transpose removed
 
@@ -278,16 +278,20 @@ class States:
                 
             #print("st_end: " + str(st_end))
             #replaced by argmax above
-            #f_int_resample[:,i] = f_int[:,st+low_sample]*(1-fract) + f_int[:,st+high_sample]*fract
-            f_int_slice = f_int[:,st:st_end]
-            f_int_max_x, f_int_max_y = np.unravel_index(f_int_slice.argmax(), f_int_slice.shape)
+            f_int_resample[:,i] = f_int[:,st+low_sample]*(1-fract) + f_int[:,st+high_sample]*fract
+            #f_int_slice = f_int[:,st:st_end]
+            #f_int_max_x, f_int_max_y = np.unravel_index(np.abs(f_int_slice).argmax(), f_int_slice.shape)
+            
             #f_int_resample[:,i] = f_int[:,f_int_max_y]
             #print(str(f_int_resample[:,i]) + "<-detection: f_int_resample")
             #print(str(f_int[:,st+low_sample]) + "<-f_int low_sample")
             # Largest amplitude tone is the winner.  Map this FSK "symbol" back to a bunch-o-bits,
             # depending on M.
-            #tone_index = np.argmax(f_int_resample[:,i], axis=0)
-            tone_index = f_int_max_x
+            # sample biggest magnitude, needs abs!!!!!
+            tone_index = np.argmax(np.abs(f_int_resample[:,i]), axis=0)
+            #tone_index = np.argmax(f_int_slice[:,5], axis=0)
+            #print("f_int_max_y: " + str(f_int_max_y))
+            #tone_index = f_int_max_x
             print("tone_index" + str(tone_index))
             #print("detection: tone_index=" + str(tone_index))
             tone_max[i] = f_int_resample[tone_index, i]

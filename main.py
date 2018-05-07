@@ -133,9 +133,9 @@ def testtone(context, text_to_tx):
     sendbits = string2bits(text_to_tx)
     bits = tx_bits(sendbits, None, M=2, CustomRs=50, CustomTsMult=1, CustomTsDiv=1, preamble=0)
     
-    fill = np.zeros((2374), dtype=np.int16)
+    fill = np.zeros((7374), dtype=np.int16)
     #apply test offset
-    #its = np.concatenate((np.squeeze(fill), bits))
+    bits = np.concatenate((np.squeeze(fill), bits))
     
     txg = bits.astype(np.int16).tolist()
     writeout = struct.pack('<' + 'h'*len(txg), *txg)
