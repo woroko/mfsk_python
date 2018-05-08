@@ -131,34 +131,34 @@ def stft(sig, frameSize, overlapFac=0.5, window=np.hanning):
 
 def testtone(context, text_to_tx):
     sendbits = string2bits(text_to_tx)
-    bits = tx_bits(sendbits, None, M=2, CustomRs=50, CustomTsMult=1, CustomTsDiv=1, preamble=0)
+    bits = tx_bits(sendbits, None, M=128, CustomRs=0.1, CustomTsMult=1, CustomTsDiv=1, preamble=0)
     
     fill = np.zeros((7374), dtype=np.int16)
     #apply test offset
-    bits = np.concatenate((np.squeeze(fill), bits))
+    #bits = np.concatenate((np.squeeze(fill), bits))
     
     txg = bits.astype(np.int16).tolist()
     writeout = struct.pack('<' + 'h'*len(txg), *txg)
     
     context.sample.write(writeout)
     #print("---BITS---: " + str(bits))
-    print("bits.shape: " + str(bits.shape))
+    #print("bits.shape: " + str(bits.shape))
     
-    context.rec_queue.put(bits)
+    #context.rec_queue.put(bits)
     
 def record_process(context, rec_queue, duration):
     fs = 8000
     rec = None
     
-    #while True:
-    if platform == 'linux':
-        rec = sd.rec(int(duration*fs), samplerate=fs, channels=1, blocking=True, dtype='int16')
-        sd.wait()
-        rec_queue.put(np.squeeze(rec))
+    while True:
+        if platform == 'linux':
+            rec = sd.rec(int(duration*fs), samplerate=fs, channels=1, blocking=True, dtype='int16')
+            sd.wait()
+            rec_queue.put(np.squeeze(rec))
      
 def decode_sound(context, to_decode, dec_queue):
-    decoded = rx_bits(to_decode, M=2, EbNodB=-1, CustomRs=50, CustomTsMult=1, CustomTsDiv=1)
-    dec_queue.put(decoded)
+    rx_bits_threaded(to_decode, dec_queue, M=128, EbNodB=-1, CustomRs=0.1, CustomTsMult=1, CustomTsDiv=1)
+    #dec_queue.put(decoded)
     
 class MyApp(App):
     stop = threading.Event()
@@ -179,6 +179,9 @@ class MyApp(App):
         self.sample.play()
         self.rec_queue = Queue.Queue()
         self.dec_queue = Queue.Queue()
+        self.start_rec(1.0)
+        decodingThread = threading.Thread(target=decode_sound, args=(self,self.rec_queue,self.dec_queue))
+        decodingThread.start()
         np.set_printoptions(threshold=np.inf)
         #root.add_widget(FigureCanvasKivyAgg(plt.gcf()))
         
@@ -197,15 +200,6 @@ class MyApp(App):
         recordingThread.start()
         
     def check_rec_dec_queue(self, dt):
-        if (self.rec_queue.qsize() > 0):
-            try:
-                to_decode = self.rec_queue.get_nowait()
-                print("to_decode shape: " + str(to_decode.shape))
-                decodingThread = threading.Thread(target=decode_sound, args=(self,to_decode,self.dec_queue))
-                decodingThread.start()
-            except Queue.Empty:
-                pass
-            
         if (self.dec_queue.qsize() > 0):
             try:
                 decode_result = self.dec_queue.get_nowait()

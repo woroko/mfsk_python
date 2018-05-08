@@ -205,6 +205,115 @@ def rx_bits(s16le_in, M=64, EbNodB=-1, CustomRs=50,
     print(str(f_log) + "\n-<f_log!")
     return np.asarray(rx_bits_log, dtype=np.uint8)
 
+def rx_bits_threaded(to_demod_queue, received_bits_queue, M=64, EbNodB=-1, CustomRs=50,
+ CustomTsMult=1, CustomTsDiv=1):
+    timing_offset = 0.0 # see resample() for clock offset below
+    fading = 0                  # modulates tx power at 2Hz with 20dB fade depth,
+                                             # to simulate balloon rotating at end of mission
+    df       = 0                    # tx tone freq drift in Hz/s
+    dA       = 1                    # amplitude imbalance of tones (note this affects Eb so not a gd idea)
+
+    states = fsk_init(8000, CustomRs, M, CustomTsMult, CustomTsDiv)
+    states.ftx = 900 + 2*states.Rs*np.arange(1,states.M+1) ##freqTx
+    states.verbose = 0x1 + 0x8
+    states.ntestframebits = states.nbit
+
+    if (EbNodB>0):
+        EbNo = 10**(EbNodB/10)
+        variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol)
+
+    N = states.N
+    P = states.P
+    Rs = states.Rs
+    nsym = states.nsym
+    nbit = states.nbit
+
+    #rx = []
+    #rx_bits_sd_log = []
+    norm_rx_timing_log = []
+    f_int_resample_log = []
+    EbNodB_log = []
+    ppm_log = []
+    f_log = []
+    rx_bits_buf = np.zeros(nbit + states.ntestframebits)
+
+    frames = 0
+    finished = False
+    #printf("states.nin: %i", states.nin)
+
+    #rx_index = 0
+    #upper_bound = int(np.size(s16le_in) / states.nin)
+    #previous_slice_end = 0
+    rx_index = 0
+    unused_samples = None
+    while(not finished):
+        nin = states.nin
+        rx_bits_log = []
+        #[sf count] = fread(fin, nin, "short")
+        
+        #slice_end = previous_slice_end + nin
+        
+        #if (rx_index >= upper_bound):
+        #   finished = True
+        #slice_end = np.size(s16le_in)
+
+        if unused_samples is None:
+            sf = to_demod_queue.get()
+        else:
+            sf = unused_samples
+            unused_samples = None
+        while len(sf) < nin: #need more samples
+            res = to_demod_queue.get()
+            sf = np.concatenate((sf, res))
+
+        if (len(sf) > nin):
+            unused_samples = sf[nin:]
+            sf = sf[0:nin]
+        
+        
+        
+        #previous_slice_end = slice_end
+        sf = sf.astype(np.float_) / 1000.0
+        sf_len = np.size(sf)
+        #rx = [rx sf]
+        #rx = rx
+        
+        
+        if (EbNodB>0):
+            noise = np.sqrt(variance)*np.random.randn(count)
+            sf += noise
+
+        #print("sf_size: " + str(np.size(sf)))
+        #print("nin: " + str(nin))
+
+        if (sf_len == nin):
+
+            frames += 1
+
+            states.f = 900 + 2*states.Rs*np.arange(1,states.M+1)
+
+            #states.f = [1450 1590 1710 1850]
+            rx_bits = states.fsk_demod(sf)
+
+            rx_bits_buf[0:states.ntestframebits] = rx_bits_buf[nbit:states.ntestframebits+nbit]
+            rx_bits_buf[states.ntestframebits:states.ntestframebits+nbit] = rx_bits
+            #print(str(rx_bits) + "\n<-rx_bits")
+            rx_bits_log.append(rx_bits.tolist())
+            norm_rx_timing_log.append(states.norm_rx_timing)
+            f_int_resample_log = f_int_resample_log + np.abs(states.f_int_resample).tolist()
+            EbNodB_log.append(states.EbNodB)
+            ppm_log.append(states.ppm)
+            f_log = f_log + states.f.tolist()
+        else:
+            finished = True
+        
+        received_bits_queue.put(np.asarray(rx_bits_log, dtype=np.uint8))
+        rx_index += 1
+    #print (str(rx_bits_log))
+    #print("<- rx_bits_log")
+    #print(str(f_log) + "\n-<f_log!")
+    #return np.asarray(rx_bits_log, dtype=np.uint8)
+
 
 def main(context):
     np.set_printoptions(threshold=np.inf)
