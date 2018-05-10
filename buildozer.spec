@@ -43,7 +43,7 @@ requirements = kivy,numpy
 # requirements.source.kivy = ../../kivy
 
 # (list) Garden requirements
-#garden_requirements = 
+#garden_requirements =
 
 # (str) Presplash of the application
 #presplash.filename = %(source.dir)s/data/presplash.png
@@ -85,7 +85,7 @@ fullscreen = 0
 #android.presplash_color = #FFFFFF
 
 # (list) Permissions
-#android.permissions = INTERNET
+android.permissions = RECORD_AUDIO
 
 # (int) Android API to use
 #android.api = 19

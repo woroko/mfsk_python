@@ -20,7 +20,7 @@ from txrxlib import *
 
 import threading
 import time
-from audiostream import get_output, AudioSample
+from audiostream import get_output, get_input, AudioSample
 from audiostream.sources.wave import SineSource
 import struct
 from functools import partial
@@ -28,6 +28,8 @@ import sounddevice as sd
 import Queue
 
 #Window.size = (600,320)
+
+global_rec_queue = Queue.Queue()
 
 def text_to_bits(text, encoding='utf-8', errors='surrogatepass'):
     bits = bin(int(binascii.hexlify(text.encode(encoding, errors)), 16))[2:]
@@ -131,37 +133,32 @@ def stft(sig, frameSize, overlapFac=0.5, window=np.hanning):
 
 def testtone(context, text_to_tx):
     sendbits = string2bits(text_to_tx)
-    bits = tx_bits(sendbits, None, M=128, CustomRs=0.1, CustomTsMult=1, CustomTsDiv=1, preamble=0)
-    
-    fill = np.zeros((7374), dtype=np.int16)
+    bits = tx_bits(sendbits, None, M=64, CustomRs=10, CustomTsMult=1, CustomTsDiv=1, preamble=0)
+
+    #fill = np.zeros((7374), dtype=np.int16)
     #apply test offset
     #bits = np.concatenate((np.squeeze(fill), bits))
-    
+
     txg = bits.astype(np.int16).tolist()
     writeout = struct.pack('<' + 'h'*len(txg), *txg)
-    
+
     context.sample.write(writeout)
-    #print("---BITS---: " + str(bits))
-    #print("bits.shape: " + str(bits.shape))
-    
-    #context.rec_queue.put(bits)
-    
-def record_process(context, rec_queue, duration):
-    fs = 8000
-    rec = None
-    
-    while True:
-        if platform == 'linux':
-            rec = sd.rec(int(duration*fs), samplerate=fs, channels=1, blocking=True, dtype='int16')
-            sd.wait()
-            rec_queue.put(np.squeeze(rec))
-     
+
+
 def decode_sound(context, to_decode, dec_queue):
-    rx_bits_threaded(to_decode, dec_queue, M=128, EbNodB=-1, CustomRs=0.1, CustomTsMult=1, CustomTsDiv=1)
+    rx_bits_threaded(to_decode, dec_queue, M=64, EbNodB=-1, CustomRs=10, CustomTsMult=1, CustomTsDiv=1)
     #dec_queue.put(decoded)
-    
+
+def record_callback(indata, frames, time, status):
+    global_rec_queue.put(np.copy(indata[::,0]))
+    #print("callback!")
+
+def record_callback_mobile(buf):
+    res = struct.unpack('<' + 'h'*len(buf), *buf)
+    global_rec_queue.put(np.asarray(res, dtype=np.int16))
+
 class MyApp(App):
-    stop = threading.Event()
+    #stop = threading.Event()
 
     def __init__(self, **kwargs):
         super(MyApp, self).__init__(**kwargs)
@@ -172,42 +169,67 @@ class MyApp(App):
         if platform == 'android':
             #pass
             self.root.padding = [0,0,0,dp(25)]
-        
-        self.stream = get_output(channels=1, rate=8000, buffersize=128)
+
+        self.stream = get_output(channels=1, rate=8000)
         self.sample = AudioSample()
         self.stream.add_sample(self.sample)
         self.sample.play()
-        self.rec_queue = Queue.Queue()
+        #self.rec_queue = Queue.Queue()
         self.dec_queue = Queue.Queue()
-        self.start_rec(1.0)
-        decodingThread = threading.Thread(target=decode_sound, args=(self,self.rec_queue,self.dec_queue))
-        decodingThread.start()
+        self.start_rec()
+        self.decodingThread = threading.Thread(target=decode_sound, args=(self,global_rec_queue,self.dec_queue))
+        self.decodingThread.start()
         np.set_printoptions(threshold=np.inf)
         #root.add_widget(FigureCanvasKivyAgg(plt.gcf()))
-        
+
         #print(self.root.ids.ti0.ids)
 
 
     def on_stop(self):
-        self.stop.set()
+        try:
+            self.input_stream.abort()
+        except:
+            try:
+                self.mobile_input_stream.stop()
+            except:
+                print("inputstream close failed")
+        self.sample.stop()
+        #empty Queue
+        while not global_rec_queue.empty():
+            try:
+                global_rec_queue.get(False)
+            except Queue.Empty:
+                continue
+            global_rec_queue.task_done()
+
+        global_rec_queue.put(None) #stop thread
+        #self.root.stop.set()
 
     def testthread(self, *l):
         #print(self.root.ids.txarea0.ids.msgIn.text)
         threading.Thread(target=testtone, args=(self,self.root.ids.txarea0.ids.msgIn.text)).start()
-    
-    def start_rec(self, duration):
-        recordingThread = threading.Thread(target=record_process, args=(self,self.rec_queue,duration))
-        recordingThread.start()
-        
+
+    def start_rec(self):
+        if platform != 'android' and platform != 'ios':
+            self.input_stream = sd.InputStream(samplerate=8000, channels=1, dtype='int16'\
+            , callback=record_callback)
+            self.input_stream.start()
+        else:
+            self.mobile_input_stream = get_input(callback=record_callback_mobile, rate=8000)
+            self.mobile_input_stream.start()
+        #recordingThread = threading.Thread(target=record_process, args=(self,self.rec_queue,duration))
+        #recordingThread.start()
+
     def check_rec_dec_queue(self, dt):
         if (self.dec_queue.qsize() > 0):
             try:
                 decode_result = self.dec_queue.get_nowait()
                 self.root.ids.ti0.text += str(decode_result) + "\n\n---\n\n"
-                #self.root.ids.ti0.text += "longest: " + 
+                #self.root.ids.ti0.text += "longest: " +
             except Queue.Empty:
+                print("Empty!!!")
                 pass
-            
+
 
     def build(self):
         self.root = Builder.load_file('guitest.kv')
@@ -217,4 +239,8 @@ class MyApp(App):
         return self.root
 
 if __name__ == '__main__':
-    MyApp().run()
+    try:
+        app = MyApp()
+        app.run()
+    except KeyboardInterrupt:
+        app.stop()

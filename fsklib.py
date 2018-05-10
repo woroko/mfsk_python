@@ -24,7 +24,7 @@ class States:
         self.Rs = int(Rs)
 
         self.nsym = 50                               # need enough symbols for good timing and freq offset est
-        Ts = self.Ts = (Fs/Rs)*TsMult/TsDiv                         # number of samples per symbol
+        Ts = self.Ts = (Fs/Rs)*float(TsMult)/float(TsDiv)                         # number of samples per symbol
         #printf("Ts: #f\n", Ts)
         assert Ts == floor(Ts), "Fs/Rs must be an integer: "
         Ts = self.Ts = int(floor(Ts))
@@ -196,7 +196,7 @@ class States:
         self.f_int = f_int
 
 
-        
+
         print("integrate!")
 
         # fine timing estimation -----------------------------------------------
@@ -218,7 +218,7 @@ class States:
         x = np.dot(timing_nl, np.exp(-1j*w*np.arange(0,Np)).transpose())
         norm_rx_timing = np.angle(x)/(2*np.pi)
         rx_timing = norm_rx_timing*P
-        
+
         self.x = x
         self.timing_nl = timing_nl
         self.rx_timing = rx_timing
@@ -250,7 +250,7 @@ class States:
         if norm_rx_timing < -0.25:
             next_nin -= Ts/2
             #print("next_nin - " + str(Ts/2))
-        
+
         self.nin = int(next_nin)
 
         # Now we know the correct fine timing offset, Re-sample integrator
@@ -275,23 +275,23 @@ class States:
             st_end = (i+1)*P
             if (st_end >= f_int.shape[1]):
                 st_end = f_int.shape[1] - 1
-                
+
             #print("st_end: " + str(st_end))
             #replaced by argmax above
             f_int_resample[:,i] = f_int[:,st+low_sample]*(1-fract) + f_int[:,st+high_sample]*fract
-            f_int_slice = f_int[:,st:st_end]
-            f_int_max_x, f_int_max_y = np.unravel_index(np.abs(f_int_slice).argmax(), f_int_slice.shape)
-            
+            #f_int_slice = f_int[:,st:st_end]
+            #f_int_max_x, f_int_max_y = np.unravel_index(np.abs(f_int_slice).argmax(), f_int_slice.shape)
+
             #f_int_resample[:,i] = f_int[:,f_int_max_y]
             #print(str(f_int_resample[:,i]) + "<-detection: f_int_resample")
             #print(str(f_int[:,st+low_sample]) + "<-f_int low_sample")
             # Largest amplitude tone is the winner.  Map this FSK "symbol" back to a bunch-o-bits,
             # depending on M.
             # sample biggest magnitude, needs abs!!!!!
-            #tone_index = np.argmax(np.abs(f_int_resample[:,i]), axis=0)
+            tone_index = np.argmax(np.abs(f_int_resample[:,i]), axis=0)
             #tone_index = np.argmax(f_int_slice[:,5], axis=0)
             #print("f_int_max_y: " + str(f_int_max_y))
-            tone_index = f_int_max_x
+            #tone_index = f_int_max_x
             #print("tone_index" + str(tone_index))
             #print("detection: tone_index=" + str(tone_index))
             tone_max[i] = f_int_resample[tone_index, i]

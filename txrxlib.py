@@ -1,6 +1,7 @@
 from fsklib import *
 import numpy as np
 import struct
+import Queue
 
 def printf(format, *args):
     print(format % args)
@@ -100,12 +101,12 @@ def tx_bits(tx_bits, ftx=None, M=64, CustomRs=50, CustomTsMult=1, CustomTsDiv=1,
     #ftx is fileTx
     #tx = vertcat(zeros(32758, 1), tx) #pad front
 
-    txg = tx*1000 #Eri voluumi dekoodatessa ei haittaa..
+    txg = tx*3000 #Eri voluumi dekoodatessa ei haittaa..
     txret = txg.astype(np.int16)
-    txg = txg.astype(np.int16).tolist()
+    #txg = txg.astype(np.int16).tolist()
     #print(txg)
-    if (ftx != None):
-        ftx.write(struct.pack('<' + 'h'*len(txg), *txg))# fclose(ftx)
+    '''if (ftx != None):
+        ftx.write(struct.pack('<' + 'h'*len(txg), *txg))'''# fclose(ftx)
 
     return txret
 
@@ -239,46 +240,50 @@ def rx_bits_threaded(to_demod_queue, received_bits_queue, M=64, EbNodB=-1, Custo
 
     frames = 0
     finished = False
-    #printf("states.nin: %i", states.nin)
 
-    #rx_index = 0
-    #upper_bound = int(np.size(s16le_in) / states.nin)
-    #previous_slice_end = 0
     rx_index = 0
     unused_samples = None
     while(not finished):
         nin = states.nin
         rx_bits_log = []
-        #[sf count] = fread(fin, nin, "short")
-        
-        #slice_end = previous_slice_end + nin
-        
-        #if (rx_index >= upper_bound):
-        #   finished = True
-        #slice_end = np.size(s16le_in)
+        sf = None
 
         if unused_samples is None:
-            sf = to_demod_queue.get()
+            while True:
+                try:
+                    sf = to_demod_queue.get_nowait()
+                    if (sf is None):
+                        return
+                    break
+                except Queue.Empty:
+                    pass
         else:
             sf = unused_samples
             unused_samples = None
         while len(sf) < nin: #need more samples
-            res = to_demod_queue.get()
+            while True:
+                try:
+                    res = to_demod_queue.get_nowait()
+                    if (res is None):
+                        return
+                    break
+                except Queue.Empty:
+                    pass
             sf = np.concatenate((sf, res))
 
         if (len(sf) > nin):
             unused_samples = sf[nin:]
             sf = sf[0:nin]
-        
-        
-        
+
+
+
         #previous_slice_end = slice_end
         sf = sf.astype(np.float_) / 1000.0
         sf_len = np.size(sf)
         #rx = [rx sf]
         #rx = rx
-        
-        
+
+
         if (EbNodB>0):
             noise = np.sqrt(variance)*np.random.randn(count)
             sf += noise
@@ -306,7 +311,8 @@ def rx_bits_threaded(to_demod_queue, received_bits_queue, M=64, EbNodB=-1, Custo
             f_log = f_log + states.f.tolist()
         else:
             finished = True
-        
+            print("Error, incorrect number of samples")
+
         received_bits_queue.put(np.asarray(rx_bits_log, dtype=np.uint8))
         rx_index += 1
     #print (str(rx_bits_log))
