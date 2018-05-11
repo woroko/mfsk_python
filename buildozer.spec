@@ -36,7 +36,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma seperated e.g. requirements = sqlite3,kivy
-requirements = kivy,numpy
+requirements = kivy,numpy,audiostream
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -88,25 +88,26 @@ fullscreen = 0
 android.permissions = RECORD_AUDIO
 
 # (int) Android API to use
-#android.api = 19
+#android.api = 23
 
 # (int) Minimum API required
-#android.minapi = 9
+#android.minapi = 19
 
 # (int) Android SDK version to use
-#android.sdk = 20
+#android.sdk = 23
 
 # (str) Android NDK version to use
 #android.ndk = 9c
+#android.ndk = 11c
 
 # (bool) Use --private data storage (True) or --dir public storage (False)
 #android.private_storage = True
 
 # (str) Android NDK directory (if empty, it will be automatically downloaded.)
-#android.ndk_path =
+#android.ndk_path = ~/Builds/android-ndk-r11c
 
 # (str) Android SDK directory (if empty, it will be automatically downloaded.)
-#android.sdk_path =
+#android.sdk_path = ~/Android/Sdk
 
 # (str) ANT directory (if empty, it will be automatically downloaded.)
 #android.ant_path =
@@ -147,7 +148,7 @@ android.permissions = RECORD_AUDIO
 #android.gradle_dependencies =
 
 # (str) python-for-android branch to use, defaults to master
-#4a.branch = stable
+p4a.branch = master
 
 # (str) OUYA Console category. Should be one of GAME or APP
 # If you leave this blank, OUYA support will not be enabled
@@ -190,7 +191,7 @@ android.arch = armeabi-v7a
 #
 
 # (str) python-for-android git clone directory (if empty, it will be automatically cloned from github)
-p4a.source_dir =~/p4a/python-for-android-0.5.3
+#p4a.source_dir =~/p4a/python-for-android
 
 # (str) The directory in which python-for-android should look for your own build recipes (if any)
 #p4a.local_recipes =
@@ -199,7 +200,7 @@ p4a.source_dir =~/p4a/python-for-android-0.5.3
 #p4a.hook =
 
 # (str) Bootstrap to use for android builds
-# p4a.bootstrap = sdl2
+#p4a.bootstrap = sdl2_gradle
 
 
 #
