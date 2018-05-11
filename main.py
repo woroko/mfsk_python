@@ -24,7 +24,8 @@ from audiostream import get_output, get_input, AudioSample
 from audiostream.sources.wave import SineSource
 import struct
 from functools import partial
-import sounddevice as sd
+if platform != 'android' and platform != 'ios':
+    import sounddevice as sd
 import Queue
 
 #Window.size = (600,320)
