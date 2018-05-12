@@ -1,7 +1,7 @@
 import numpy as np
 import binascii
 import random, string
-from baudot import *
+#from baudot import *
 import kivy
 from kivy.app import App
 from kivy.lang import Builder
@@ -88,7 +88,7 @@ def randomword(length):
    letters = string.printable
    return ''.join(random.choice(letters) for i in range(length))
 
-def main():
+'''def main():
     #while(true):
     textline = input("TX: ")
 
@@ -114,7 +114,7 @@ def main():
 
     print("ORIG AND DEC MATCH? " + str(original == decoded))
 
-    print("DECS: " + originaldecodeBaudot(decoded))
+    print("DECS: " + originaldecodeBaudot(decoded))'''
 
 def stft(sig, frameSize, overlapFac=0.5, window=np.hanning):
     win = window(frameSize)
