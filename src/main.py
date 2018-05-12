@@ -1,3 +1,7 @@
+from kivy.config import Config
+Config.set('graphics', 'maxfps', '20') #more cpu for decoding
+Config.set('graphics', 'multisamples', '0')
+
 import numpy as np
 import binascii
 import random, string
@@ -20,8 +24,11 @@ from txrxlib import *
 
 import threading
 import time
-from audiostream import get_output, get_input, AudioSample
-from audiostream.sources.wave import SineSource
+from audiostream import get_output, AudioSample
+if platform == 'android' or platform == 'ios':
+    from audiostream import get_input
+'''if platform == 'android':
+    from jnius import autoclass'''
 import struct
 from functools import partial
 if platform != 'android' and platform != 'ios':
@@ -134,7 +141,7 @@ def stft(sig, frameSize, overlapFac=0.5, window=np.hanning):
 
 def testtone(context, text_to_tx):
     sendbits = string2bits(text_to_tx)
-    bits = tx_bits(sendbits, None, M=64, CustomRs=10, CustomTsMult=1, CustomTsDiv=1, preamble=0)
+    bits = tx_bits(sendbits, None, M=32, CustomRs=10, CustomTsMult=1, CustomTsDiv=1, preamble=0)
 
     #fill = np.zeros((7374), dtype=np.int16)
     #apply test offset
@@ -147,7 +154,7 @@ def testtone(context, text_to_tx):
 
 
 def decode_sound(context, to_decode, dec_queue):
-    rx_bits_threaded(to_decode, dec_queue, M=64, EbNodB=-1, CustomRs=10, CustomTsMult=1, CustomTsDiv=1)
+    rx_bits_threaded(to_decode, dec_queue, M=32, EbNodB=-1, CustomRs=10, CustomTsMult=1, CustomTsDiv=1)
     #dec_queue.put(decoded)
 
 def record_callback(indata, frames, time, status):
@@ -155,8 +162,10 @@ def record_callback(indata, frames, time, status):
     #print("callback!")
 
 def record_callback_mobile(buf):
-    res = struct.unpack('<' + 'h'*len(buf), *buf)
-    global_rec_queue.put(np.asarray(res, dtype=np.int16))
+    #res = struct.unpack('<' + 'h'*len(buf), str(buf))
+    global_rec_queue.put(np.frombuffer(buf, dtype=np.int16))
+    #global_rec_queue.put(np.asarray(res, dtype=np.int16))
+    #print("callback!")
 
 class MyApp(App):
     #stop = threading.Event()
@@ -168,14 +177,12 @@ class MyApp(App):
 
     def _do_setup(self, *l):
         if platform == 'android':
-            #pass
             self.root.padding = [0,0,0,dp(25)]
 
         self.stream = get_output(channels=1, rate=8000)
         self.sample = AudioSample()
         self.stream.add_sample(self.sample)
         self.sample.play()
-        #self.rec_queue = Queue.Queue()
         self.dec_queue = Queue.Queue()
         self.start_rec()
         self.decodingThread = threading.Thread(target=decode_sound, args=(self,global_rec_queue,self.dec_queue))
@@ -185,6 +192,8 @@ class MyApp(App):
 
         #print(self.root.ids.ti0.ids)
 
+    def readbuffer(self, *l):
+        self.mobile_input_stream.poll()
 
     def on_stop(self):
         try:
@@ -209,15 +218,34 @@ class MyApp(App):
     def testthread(self, *l):
         #print(self.root.ids.txarea0.ids.msgIn.text)
         threading.Thread(target=testtone, args=(self,self.root.ids.txarea0.ids.msgIn.text)).start()
+        pass
 
     def start_rec(self):
-        if platform != 'android' and platform != 'ios':
+
+        if platform == 'android':
+            '''self.MediaRecorder = autoclass('android.media.MediaRecorder')
+            self.AudioSource = autoclass('android.media.MediaRecorder$AudioSource')
+            self.AudioFormat = autoclass('android.media.AudioFormat')
+            self.AudioRecord = autoclass('android.media.AudioRecord')
+            # define our system
+            self.SampleRate = 8000
+            self.ChannelConfig = self.AudioFormat.CHANNEL_IN_MONO
+            self.AudioEncoding = self.AudioFormat.ENCODING_PCM_16BIT
+            #self.BufferSize = self.AudioRecord.getMinBufferSize(self.SampleRate, self.ChannelConfig, self.AudioEncoding)*8
+            #if self.BufferSize < 16384:
+            #    self.BufferSize = 16384'''
+            self.BufferSize = 16384
+            self.mobile_input_stream = get_input(callback=record_callback_mobile, source='default', buffersize=self.BufferSize, rate=8000)
+            self.mobile_input_stream.start()
+            Clock.schedule_interval(self.readbuffer, 1/float(10))
+        elif platform == 'ios':
+            self.mobile_input_stream = get_input(callback=record_callback_mobile, source='default', rate=8000)
+            self.mobile_input_stream.start()
+            Clock.schedule_interval(self.readbuffer, 1/float(60))
+        else:
             self.input_stream = sd.InputStream(samplerate=8000, channels=1, dtype='int16'\
             , callback=record_callback)
             self.input_stream.start()
-        else:
-            self.mobile_input_stream = get_input(callback=record_callback_mobile, rate=8000)
-            self.mobile_input_stream.start()
         #recordingThread = threading.Thread(target=record_process, args=(self,self.rec_queue,duration))
         #recordingThread.start()
 
@@ -231,11 +259,14 @@ class MyApp(App):
                 print("Empty!!!")
                 pass
 
+    def print_dec_status(self, *l):
+        print("global_rec_queue size: " + str(global_rec_queue.qsize()))
 
     def build(self):
         self.root = Builder.load_file('guitest.kv')
         Clock.schedule_once(self._do_setup)
         Clock.schedule_interval(self.check_rec_dec_queue, 0.1)
+        Clock.schedule_interval(self.print_dec_status, 4.0)
         #Clock.schedule_once(self.testthread)
         return self.root
 

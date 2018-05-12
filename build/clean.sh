@@ -1,0 +1,1 @@
+p4a clean_bootstrap_builds clean_dists clean_builds clean clean_recipe_build

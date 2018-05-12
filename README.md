@@ -15,3 +15,8 @@ The aim of this project is to enable low symbol rate encrypted text messaging ov
 The targeted symbol rate is in the order of many seconds per symbol.
 
 Never transmit if it is illegal in your country.
+
+Info:
+Error 'Didn't find class "org.audiostream.AudioIn" on path':
+
+Solution: add AudioIn.java to dist org/audiostream/...
